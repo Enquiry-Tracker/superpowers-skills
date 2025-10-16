@@ -2,7 +2,7 @@
 name: Creating Jira Issues and Bitbucket PRs
 description: Set up jira CLI and create issues with Bitbucket PRs for completed work
 when_to_use: when work is complete and ready for review, needs tracking in Jira and code review via Bitbucket pull requests
-version: 1.0.0
+version: 1.1.0
 languages: all
 dependencies: jira CLI (go-jira), git, Bitbucket
 ---
@@ -137,24 +137,15 @@ _italic text_
 [Link text|http://url.com]
 ```
 
-## Complete Workflow: Code → Issue → PR
+## Complete Workflow: Issue → Branch → Code → PR
 
-### 1. Commit Your Changes
+### 1. Create Jira Issue First
 
-```bash
-git add .
-git commit -m "Your commit message"
-git push origin your-branch
-```
-
-### 2. Create Jira Issue
-
-Prepare issue template with:
-- Summary of changes
+Prepare issue template describing the work to be done:
+- Summary of planned changes
 - Security impact / priority
-- Files modified
-- Testing results
-- Branch name and commit hash
+- Expected files to modify
+- Testing approach
 
 ```bash
 export JIRA_API_TOKEN='your-token'
@@ -163,20 +154,68 @@ jira create --noedit -t your-template
 
 **Capture the issue key** (e.g., ET-1234)
 
-### 3. Create Bitbucket PR
+### 2. Create Feature Branch with Issue Prefix
 
-1. Push branch to Bitbucket (if not already pushed)
-2. Create PR via Bitbucket web UI or URL pattern:
-   - `https://bitbucket.org/org/repo/pull-requests/new?source=branch-name&t=1`
-3. Link Jira issue in PR description:
-   - Format: `Closes ET-1234` or `Fixes ET-1234`
-   - Bitbucket auto-links when it sees issue keys
+**IMPORTANT:** Branch names must start with the issue key
 
-### 4. Cross-Link
+```bash
+# Create feature branch from develop/main
+git checkout develop
+git pull origin develop
+git checkout -b ET-1234-short-description
+```
 
-Add PR URL to Jira issue (optional but helpful):
-- Comment with PR link
-- Or update description with link
+**Branch naming pattern:** `ISSUE-KEY-brief-description`
+- Example: `ET-8765-input-validation-security-fixes`
+- Lowercase with hyphens
+- Keep description concise but meaningful
+
+### 3. Make Changes and Commit
+
+```bash
+# Make your code changes
+git add .
+git commit -m "Your descriptive commit message"
+git push -u origin ET-1234-short-description
+```
+
+### 4. Create Bitbucket PR
+
+**PR Title Format:** `ET-1234: Description of changes`
+- **Always prefix with issue key and colon**
+- Example: `ET-8765: Add comprehensive input validation to all public endpoints`
+
+**PR Description Format:**
+```markdown
+**Closes ET-1234**
+
+## Summary
+Brief overview of changes
+
+## What Changed
+- Bullet point 1
+- Bullet point 2
+
+## Testing
+All tests pass
+
+**Jira:** https://company.atlassian.net/browse/ET-1234
+**Branch:** ET-1234-branch-name
+**Commit:** commit-hash
+```
+
+**Create PR:**
+1. Via URL: `https://bitbucket.org/org/repo/pull-requests/new?source=ET-1234-branch-name&dest=develop&t=1`
+2. Or via Bitbucket web UI
+
+**Auto-linking:** Use `Closes ET-1234`, `Fixes ET-1234`, or `Resolves ET-1234` at the top of PR description
+
+### 5. Verify Auto-Linking
+
+Check that:
+- PR shows in Jira issue's "Development" section
+- Issue key appears as link in PR
+- Status transitions work (if configured)
 
 ## Common Mistakes
 
@@ -216,6 +255,23 @@ export JIRA_API_TOKEN='token' && jira create ...
 
 **Fix:** Add `project: XX` to `~/.jira.d/config.yml`
 
+### ❌ PR Title Without Issue Key Prefix
+
+**Problem:** PR title doesn't start with issue key (e.g., "Add validation" instead of "ET-1234: Add validation")
+
+**Fix:** Always prefix PR title with `ISSUE-KEY: ` format
+- ✅ Good: `ET-8765: Add comprehensive input validation`
+- ❌ Bad: `Add comprehensive input validation`
+
+### ❌ Branch Not Named After Issue
+
+**Problem:** Branch name doesn't include issue key, breaking traceability
+
+**Fix:** Always create branch starting with issue key:
+```bash
+git checkout -b ET-1234-descriptive-name
+```
+
 ## Troubleshooting
 
 ### Session Authentication Issues
@@ -249,11 +305,16 @@ For Jira issues to auto-link in Bitbucket:
 
 From our security validation work:
 
-1. **Committed changes:** 9 files with input validation fixes
-2. **Created template:** `~/.jira.d/templates/create-security-issue`
-3. **Created issue:** `jira create --noedit -t create-security-issue`
-4. **Result:** ET-8765 created with full context
-5. **Created PR:** Used Bitbucket URL pattern with branch name
-6. **Linked:** Added PR link to Jira issue description
+1. **Created Jira issue first:** `jira create --noedit -t create-security-issue`
+   - Result: ET-8765 created
+2. **Created feature branch:** `git checkout -b ET-8765-input-validation-security-fixes`
+3. **Made changes:** Modified 9 files with input validation fixes
+4. **Committed and pushed:** `git commit` and `git push -u origin ET-8765-input-validation-security-fixes`
+5. **Created PR with proper format:**
+   - Title: `ET-8765: Add comprehensive input validation to all public endpoints`
+   - Description started with: `**Closes ET-8765**`
+   - Auto-linked to Jira issue
+6. **Result:** Full traceability from issue → branch → commits → PR
 
 **Time saved:** 5-10 minutes vs manual issue creation in web UI
+**Bonus:** Automatic linking between Jira and Bitbucket
