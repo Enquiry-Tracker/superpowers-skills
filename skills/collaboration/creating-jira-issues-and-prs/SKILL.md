@@ -1,8 +1,8 @@
 ---
 name: Creating Jira Issues and Bitbucket PRs
-description: Create issues and PRs with jira CLI for completed work
-when_to_use: when work is complete and ready for review, needs tracking in Jira and code review via Bitbucket pull requests
-version: 1.2.0
+description: Create or reuse Jira issues and link them with Bitbucket PRs
+when_to_use: when work is complete and needs tracking in Jira and code review via Bitbucket pull requests
+version: 1.3.0
 languages: all
 dependencies: jira CLI (go-jira), git, Bitbucket
 ---
@@ -11,18 +11,17 @@ dependencies: jira CLI (go-jira), git, Bitbucket
 
 ## Overview
 
-Use jira CLI to create Jira issues and link them with Bitbucket pull requests. This workflow ensures traceability between issue tracking and code changes.
+Use jira CLI to create or reuse Jira issues and link them with Bitbucket pull requests. Check for existing issues first to avoid duplication, especially for similar work across repositories.
 
 ## When to Use
 
 - Work is complete and committed to git
-- Need to create Jira issue to track the work
+- Need to track work in Jira
 - Need to open Bitbucket PR for code review
 - First time using jira CLI (includes setup instructions)
 
 **Do NOT use when:**
 - Using GitHub (this is for Bitbucket/Jira workflows)
-- Issue already exists (link to existing issue)
 
 ## Quick Reference
 
@@ -30,9 +29,11 @@ Use jira CLI to create Jira issues and link them with Bitbucket pull requests. T
 |------|---------|
 | Install jira CLI | `brew install go-jira` |
 | Check auth | `jira session` |
-| Create issue | `jira create --noedit -t template-name` |
-| List issues | `jira ls --query "project = XX"` |
+| Search issues | `jira ls --query "text ~ 'keywords'"` |
+| Search by summary | `jira ls --query "summary ~ 'improve CLAUDE'"` |
 | View issue | `jira view ISSUE-123` |
+| Create issue | `jira create --noedit -t template-name` |
+| List recent issues | `jira ls --query "project = XX ORDER BY created DESC"` |
 
 ## Initial Setup (One-Time)
 
@@ -139,22 +140,47 @@ _italic text_
 
 ## Complete Workflow: Issue → Branch → Code → PR
 
-### 1. Create Jira Issue First
+### 1. Check for Existing Issues First
 
-Prepare issue template describing the work:
-- Summary of planned changes
-- Security impact / priority
-- Expected files to modify
-- Testing approach
+**IMPORTANT:** Before creating a new issue, search for existing ones to avoid duplication.
 
 ```bash
+# Search by keywords in summary and description
+export JIRA_API_TOKEN='your-token'
+jira ls --query "text ~ 'improve CLAUDE' AND project = ET"
+
+# Search recent issues
+jira ls --query "project = ET ORDER BY created DESC" | head -10
+
+# View specific issue to check if reusable
+jira view ET-8772
+```
+
+**When to Reuse an Existing Issue:**
+- Similar work across different repositories (e.g., ET-8772 and ET-8773 both improve CLAUDE.md)
+- Same logical task split into multiple PRs
+- Follow-up work directly related to original issue
+- Documentation updates applied to multiple repos
+
+**When to Create a New Issue:**
+- Completely different work, even if similar topic
+- Different project goals or acceptance criteria
+- Requires separate tracking/reporting
+- Different priority or timeline
+
+### 2. Create New Jira Issue (if needed)
+
+If no existing issue fits, create one:
+
+```bash
+# Prepare issue template describing the work
 export JIRA_API_TOKEN='your-token'
 jira create --noedit -t your-template
 ```
 
 **Capture the issue key** (e.g., ET-1234)
 
-### 2. Create Feature Branch with Issue Prefix
+### 3. Create Feature Branch with Issue Prefix
 
 **IMPORTANT:** Branch names must start with the issue key
 
@@ -170,7 +196,12 @@ git checkout -b ET-1234-short-description
 - Lowercase with hyphens
 - Keep description concise but meaningful
 
-### 3. Make Changes and Commit
+**For reused issues across repos:**
+- Use same issue key in different repositories
+- Example: ET-8772 used for CLAUDE.md improvements in both `superpowers-skills` and other repos
+- Branch name stays consistent: `ET-8772-improve-claude-md`
+
+### 4. Make Changes and Commit
 
 ```bash
 # Make your code changes
@@ -179,7 +210,7 @@ git commit -m "Your descriptive commit message"
 git push -u origin ET-1234-short-description
 ```
 
-### 4. Create Bitbucket PR
+### 5. Create Bitbucket PR
 
 **PR Title Format:** `ET-1234: Description of changes`
 - **Always prefix with issue key and colon**
@@ -204,18 +235,28 @@ All tests pass
 **Commit:** commit-hash
 ```
 
+**For reused issues:**
+- Use `Relates to ET-1234` instead of `Closes ET-1234` for subsequent PRs
+- Example: Second PR uses "Relates to ET-8772" since first PR already closed it
+- All PRs still link to the issue, maintaining traceability
+
 **Create PR:**
 1. Via URL: `https://bitbucket.org/org/repo/pull-requests/new?source=ET-1234-branch-name&dest=develop&t=1`
 2. Or via Bitbucket web UI
 
-**Auto-linking:** Use `Closes ET-1234`, `Fixes ET-1234`, or `Resolves ET-1234` at the top of PR description
+**Auto-linking keywords:**
+- `Closes ET-1234` - Closes issue when PR merges (use for first/only PR)
+- `Fixes ET-1234` - Same as Closes
+- `Resolves ET-1234` - Same as Closes
+- `Relates to ET-1234` - Links without closing (use for additional PRs)
 
-### 5. Verify Auto-Linking
+### 6. Verify Auto-Linking
 
 Check that:
 - PR shows in Jira issue's "Development" section
 - Issue key appears as link in PR
 - Status transitions work (if configured)
+- Multiple PRs from different repos all link to same issue (when reusing)
 
 ## Common Mistakes
 
@@ -272,6 +313,18 @@ export JIRA_API_TOKEN='token' && jira create ...
 git checkout -b ET-1234-descriptive-name
 ```
 
+### ❌ Creating Duplicate Issues for Similar Work
+
+**Problem:** Creating new issues for the same logical task across repos (e.g., ET-8772 and ET-8773 both improve CLAUDE.md)
+
+**Fix:** Search first, reuse existing issues when appropriate:
+```bash
+jira ls --query "text ~ 'improve CLAUDE' AND project = ET"
+```
+
+**When to reuse:** Same work across repos, related PRs, follow-up work
+**When to create new:** Different goals, different tracking needs
+
 ## Troubleshooting
 
 ### Session Authentication Issues
@@ -301,9 +354,9 @@ For Jira issues to auto-link in Bitbucket:
 3. Use keywords: Closes, Fixes, Resolves
 4. Ensure Jira-Bitbucket integration is enabled
 
-## Real-World Example
+## Real-World Examples
 
-From security validation work:
+### Example 1: New Issue for Security Work
 
 1. **Created Jira issue:** `jira create --noedit -t create-security-issue`
    - Result: ET-8765 created
@@ -316,5 +369,25 @@ From security validation work:
    - Auto-linked to Jira issue
 6. **Result:** Full traceability from issue → branch → commits → PR
 
-**Time saved:** 5-10 minutes vs manual issue creation in web UI
-**Bonus:** Automatic linking between Jira and Bitbucket
+### Example 2: Reusing Issue Across Repos
+
+1. **Searched for existing issues:**
+   ```bash
+   jira ls --query "text ~ 'improve CLAUDE' AND project = ET"
+   # Found: ET-8772 - Improve CLAUDE.md clarity following Elements of Style
+   ```
+2. **Viewed issue to confirm it fits:**
+   ```bash
+   jira view ET-8772
+   # Confirmed: Same work (applying Elements of Style to CLAUDE.md)
+   ```
+3. **Reused ET-8772 in second repo:**
+   - First PR in `superpowers-skills`: Used `Closes ET-8772`
+   - Second PR in `enrollment_node`: Used `Relates to ET-8772`
+4. **Result:**
+   - Single issue tracks related work across repos
+   - Both PRs visible in ET-8772's Development section
+   - Avoided duplicate issue (ET-8773 would have been unnecessary)
+
+**Time saved:** 5-10 minutes per issue vs manual creation
+**Bonus:** Reduced issue clutter, better organization
