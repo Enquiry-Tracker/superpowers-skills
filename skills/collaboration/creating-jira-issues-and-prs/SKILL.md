@@ -60,7 +60,7 @@ export JIRA_API_TOKEN='your-api-token'
 echo $JIRA_API_TOKEN | jira session
 ```
 
-**Get API token:** https://id.atlassian.com/manage-profile/security/api-tokens
+**Get API token:** [https://id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens)
 
 The jira CLI stores credentials in your system keyring after first authentication.
 
@@ -121,7 +121,7 @@ jira create --noedit -t bug-fix
 
 Common formatting for issue descriptions:
 
-```
+```text
 h1. Heading 1
 h2. Heading 2
 h3. Heading 3
@@ -259,7 +259,7 @@ export JIRA_API_TOKEN='token' && jira create ...
 
 **Problem:** PR title doesn't start with issue key (e.g., "Add validation" instead of "ET-1234: Add validation")
 
-**Fix:** Always prefix PR title with `ISSUE-KEY: ` format
+**Fix:** Always prefix PR title with `ISSUE-KEY:` format
 - ✅ Good: `ET-8765: Add comprehensive input validation`
 - ❌ Bad: `Add comprehensive input validation`
 
