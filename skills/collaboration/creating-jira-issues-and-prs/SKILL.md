@@ -1,8 +1,8 @@
 ---
 name: Creating Jira Issues and Bitbucket PRs
-description: Set up jira CLI and create issues with Bitbucket PRs for completed work
+description: Create issues and PRs with jira CLI for completed work
 when_to_use: when work is complete and ready for review, needs tracking in Jira and code review via Bitbucket pull requests
-version: 1.1.0
+version: 1.2.0
 languages: all
 dependencies: jira CLI (go-jira), git, Bitbucket
 ---
@@ -11,7 +11,7 @@ dependencies: jira CLI (go-jira), git, Bitbucket
 
 ## Overview
 
-Use the jira CLI tool to create Jira issues and link them with Bitbucket pull requests for code review. This workflow ensures traceability between issue tracking and code changes.
+Use jira CLI to create Jira issues and link them with Bitbucket pull requests. This workflow ensures traceability between issue tracking and code changes.
 
 ## When to Use
 
@@ -22,7 +22,7 @@ Use the jira CLI tool to create Jira issues and link them with Bitbucket pull re
 
 **Do NOT use when:**
 - Using GitHub (this is for Bitbucket/Jira workflows)
-- Issue already exists (just link to existing issue)
+- Issue already exists (link to existing issue)
 
 ## Quick Reference
 
@@ -62,9 +62,9 @@ echo $JIRA_API_TOKEN | jira session
 
 **Get API token:** [https://id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens)
 
-The jira CLI stores credentials in your system keyring after first authentication.
+Jira CLI stores credentials in your system keyring after first authentication.
 
-## Creating Issues with Templates
+## Create Issues with Templates
 
 ### 1. Create Template Directory
 
@@ -141,7 +141,7 @@ _italic text_
 
 ### 1. Create Jira Issue First
 
-Prepare issue template describing the work to be done:
+Prepare issue template describing the work:
 - Summary of planned changes
 - Security impact / priority
 - Expected files to modify
@@ -303,9 +303,9 @@ For Jira issues to auto-link in Bitbucket:
 
 ## Real-World Example
 
-From our security validation work:
+From security validation work:
 
-1. **Created Jira issue first:** `jira create --noedit -t create-security-issue`
+1. **Created Jira issue:** `jira create --noedit -t create-security-issue`
    - Result: ET-8765 created
 2. **Created feature branch:** `git checkout -b ET-8765-input-validation-security-fixes`
 3. **Made changes:** Modified 9 files with input validation fixes
