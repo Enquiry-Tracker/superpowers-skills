@@ -2,7 +2,7 @@
 name: Creating Jira Issues and Bitbucket PRs
 description: Create or reuse Jira issues and link them with Bitbucket PRs
 when_to_use: when work is complete and needs tracking in Jira and code review via Bitbucket pull requests
-version: 1.3.0
+version: 1.5.0
 languages: all
 dependencies: jira CLI (go-jira), git, Bitbucket
 ---
@@ -29,11 +29,12 @@ Use jira CLI to create or reuse Jira issues and link them with Bitbucket pull re
 |------|---------|
 | Install jira CLI | `brew install go-jira` |
 | Check auth | `jira session` |
-| Search issues | `jira ls --query "text ~ 'keywords'"` |
-| Search by summary | `jira ls --query "summary ~ 'improve CLAUDE'"` |
 | View issue | `jira view ISSUE-123` |
-| Create issue | `jira create --noedit -t template-name` |
-| List recent issues | `jira ls --query "project = XX ORDER BY created DESC"` |
+| Create issue | `export JIRA_API_TOKEN='token' && jira create --noedit -t template-name` |
+| Cherry-pick commit | `git cherry-pick <commit-hash>` |
+| Reset to commit | `git reset --hard <commit-hash>` |
+| Force push | `git push -f origin branch-name` |
+| Open PR URL | `open "https://bitbucket.org/org/repo/pull-requests/new?source=branch&t=1"` |
 
 ## Initial Setup (One-Time)
 
@@ -145,16 +146,17 @@ _italic text_
 **IMPORTANT:** Before creating a new issue, search for existing ones to avoid duplication.
 
 ```bash
-# Search by keywords in summary and description
-export JIRA_API_TOKEN='your-token'
-jira ls --query "text ~ 'improve CLAUDE' AND project = ET"
-
-# Search recent issues
-jira ls --query "project = ET ORDER BY created DESC" | head -10
-
 # View specific issue to check if reusable
 jira view ET-8772
+
+# List recent issues (if search doesn't work)
+jira list -q "project = ET ORDER BY created DESC" 2>/dev/null | head -10
+
+# Or use Jira web interface to search:
+# https://yourcompany.atlassian.net/browse/ET-board?quickFilter=recent
 ```
+
+**Note:** The `jira list` command with JQL queries may not work reliably in all environments. If you get usage errors, use `jira view` for specific issues or search via the Jira web interface.
 
 **When to Reuse an Existing Issue:**
 - Similar work across different repositories (e.g., ET-8772 and ET-8773 both improve CLAUDE.md)
@@ -242,7 +244,8 @@ All tests pass
 
 **Create PR:**
 1. Via URL: `https://bitbucket.org/org/repo/pull-requests/new?source=ET-1234-branch-name&dest=develop&t=1`
-2. Or via Bitbucket web UI
+2. Open automatically: `open "https://bitbucket.org/org/repo/pull-requests/new?source=ET-1234-branch-name&t=1"`
+3. Or via Bitbucket web UI
 
 **Auto-linking keywords:**
 - `Closes ET-1234` - Closes issue when PR merges (use for first/only PR)
@@ -290,6 +293,18 @@ export JIRA_API_TOKEN='token' && jira create ...
 - `**bold**` → `*bold*`
 - ` ```code``` ` → `{code}code{code}`
 
+### ❌ Using Double Curly Braces in Templates
+
+**Problem:** `{{text}}` in templates gets interpreted as Go template variables, causing "function not defined" errors
+
+**Fix:** Avoid double curly braces in Jira wiki markup within templates:
+- ❌ Bad: `* {{DITTOFEED.md}} (new file)`
+- ✅ Good: `* DITTOFEED.md (new file)`
+- ❌ Bad: `* Modified {{src/services/file.ts}}`
+- ✅ Good: `* Modified src/services/file.ts`
+
+**Note:** Jira wiki markup uses `{{monospace}}` for formatting, but this conflicts with Go templates. Use plain text in template descriptions.
+
 ### ❌ Missing Project Key in Config
 
 **Problem:** Must specify project for every create
@@ -324,6 +339,29 @@ jira ls --query "text ~ 'improve CLAUDE' AND project = ET"
 
 **When to reuse:** Same work across repos, related PRs, follow-up work
 **When to create new:** Different goals, different tracking needs
+
+### ❌ Force Pushing Without Checking Branch
+
+**Problem:** Force pushing to protected branches (main/develop/master) can destroy team's work
+
+**Fix:** ALWAYS verify current branch before force pushing:
+```bash
+git branch --show-current
+# Verify it's a feature branch, NOT main/develop/master
+git push -f origin feature-branch-name
+```
+
+**Safe to force push:**
+- ✅ Feature branches (ET-1234-*)
+- ✅ Personal branches
+- ✅ Before anyone else has pulled your branch
+
+**NEVER force push:**
+- ❌ main
+- ❌ master
+- ❌ develop
+- ❌ Any shared/protected branch
+- ❌ After others have based work on your branch
 
 ## Troubleshooting
 
@@ -391,3 +429,87 @@ For Jira issues to auto-link in Bitbucket:
 
 **Time saved:** 5-10 minutes per issue vs manual creation
 **Bonus:** Reduced issue clutter, better organization
+
+### Example 3: Separating Work to Different Branches
+
+When work was committed to the wrong branch:
+
+1. **Discovered documentation work on test branch:**
+   ```bash
+   git branch --show-current
+   # ET-8785-add-dittofeed-tests (wrong branch for docs)
+   ```
+
+2. **Created new Jira issue for documentation:**
+   ```bash
+   export JIRA_API_TOKEN='token'
+   jira create --noedit -t dittofeed-documentation
+   # Created: ET-8786
+   ```
+
+3. **Created new branch from develop:**
+   ```bash
+   git fetch origin develop
+   git checkout -b ET-8786-document-dittofeed-service origin/develop
+   ```
+
+4. **Cherry-picked documentation commit:**
+   ```bash
+   git log ET-8785-add-dittofeed-tests --oneline
+   # 54f01ff6 Add comprehensive documentation for dittofeed.ts
+   git cherry-pick 54f01ff6
+   ```
+
+5. **Pushed and created separate PR:**
+   ```bash
+   git push -u origin ET-8786-document-dittofeed-service
+   open "https://bitbucket.org/org/repo/pull-requests/new?source=ET-8786-document-dittofeed-service&t=1"
+   ```
+
+6. **Result:**
+   - Documentation work tracked under separate issue (ET-8786)
+   - Test work remains on original branch (ET-8785)
+   - Clean separation of concerns
+   - Each PR focused on single topic
+
+### Example 4: Removing Unwanted Commits from Branch
+
+When commits need to be completely removed from a branch:
+
+1. **Identified unwanted commits:**
+   ```bash
+   git log --oneline origin/develop..HEAD
+   # 233e3cb7 Revert "Add comprehensive documentation for dittofeed.ts"
+   # 54f01ff6 Add comprehensive documentation for dittofeed.ts
+   # 08dd9d48 Add comprehensive unit tests for dittofeed service (KEEP)
+   ```
+
+2. **Reset branch to desired commit:**
+   ```bash
+   git reset --hard 08dd9d48
+   # HEAD is now at 08dd9d48 Add comprehensive unit tests for dittofeed service
+   ```
+
+3. **Verify clean state:**
+   ```bash
+   git log --oneline origin/develop..HEAD
+   # 08dd9d48 Add comprehensive unit tests for dittofeed service
+   ```
+
+4. **Force push to remote:**
+   ```bash
+   git push -f origin ET-8785-add-dittofeed-tests
+   ```
+
+5. **Result:**
+   - Branch history completely rewritten
+   - Unwanted commits removed permanently
+   - Clean, focused branch with only relevant work
+   - Existing PR automatically updated
+
+**When to use:**
+- Commits were made to wrong branch and need complete removal
+- Want to rewrite history before PR review
+- Need to clean up messy commit history
+
+**IMPORTANT:** Only force push to feature branches, never to main/develop/master!
