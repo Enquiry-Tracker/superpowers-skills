@@ -2,9 +2,9 @@
 name: Creating Jira Issues and Bitbucket PRs
 description: Create or reuse Jira issues and link them with Bitbucket PRs
 when_to_use: when work is complete and needs tracking in Jira and code review via Bitbucket pull requests
-version: 1.3.0
+version: 2.0.0
 languages: all
-dependencies: jira CLI (go-jira), git, Bitbucket
+dependencies: jira-cli (ankitpokhrel/jira-cli), git, Bitbucket
 ---
 
 # Creating Jira Issues and Bitbucket PRs
@@ -27,96 +27,107 @@ Use jira CLI to create or reuse Jira issues and link them with Bitbucket pull re
 
 | Task | Command |
 |------|---------|
-| Install jira CLI | `brew install go-jira` |
-| Check auth | `jira session` |
-| Search issues | `jira ls --query "text ~ 'keywords'"` |
-| Search by summary | `jira ls --query "summary ~ 'improve CLAUDE'"` |
-| View issue | `jira view ISSUE-123` |
-| Create issue | `jira create --noedit -t template-name` |
-| List recent issues | `jira ls --query "project = XX ORDER BY created DESC"` |
+| Install jira CLI | `brew install jira-cli` |
+| Check auth | `jira me` |
+| Search issues | `jira issue list "keywords"` |
+| Search with JQL | `jira issue list --jql "text ~ 'keywords' AND project = ET"` |
+| View issue | `jira issue view ISSUE-123` |
+| Create issue | `jira issue create --template /path/to/template.tmpl --no-input` |
+| List recent issues | `jira issue list --order-by created --reverse` |
 
 ## Initial Setup (One-Time)
 
 ### 1. Install jira CLI
 
 ```bash
-brew install go-jira
+brew install jira-cli
 ```
 
-### 2. Create Configuration
-
-Create `~/.jira.d/config.yml`:
-
-```yaml
-endpoint: https://yourcompany.atlassian.net
-user: your-email@company.com
-password-source: keyring
-project: XX  # Default project key
-```
-
-### 3. Authenticate
-
-```bash
-export JIRA_API_TOKEN='your-api-token'
-echo $JIRA_API_TOKEN | jira session
-```
+### 2. Get API Token
 
 **Get API token:** [https://id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens)
 
-Jira CLI stores credentials in your system keyring after first authentication.
+### 3. Initialize Configuration
+
+```bash
+export JIRA_API_TOKEN='your-api-token'
+jira init
+```
+
+The interactive setup will prompt you for:
+- **Installation type:** Cloud (for Atlassian Cloud) or Local (on-premise)
+- **Server URL:** `https://yourcompany.atlassian.net`
+- **Login email:** `your-email@company.com`
+- **Default project:** Project key (e.g., ET)
+- **Board:** Default board for the project
+
+Configuration is saved to `~/.config/.jira/.config.yml`
+
+### 4. Verify Authentication
+
+```bash
+jira me
+```
+
+This displays your configured Jira user information if authentication is successful.
 
 ## Create Issues with Templates
 
-### 1. Create Template Directory
+### 1. Create Template File
 
-```bash
-mkdir -p ~/.jira.d/templates
+The new jira-cli uses simple text templates. Create a file (e.g., `bug-fix-description.tmpl`):
+
+```text
+h2. Summary
+Brief overview of the issue
+
+h2. Description
+Detailed description using Jira wiki markup
+
+h3. What Changed
+* Bullet point 1
+* Bullet point 2
+
+h3. Files Modified
+* path/to/file1.ts
+* path/to/file2.ts
+
+h3. Testing
+All tests pass - provide evidence
+
+h3. Related Links
+* Branch: branch-name
+* Commit: commit-hash
 ```
 
-### 2. Create YAML Template
+**Note:** Templates contain only the description body. Other fields are set via flags.
 
-Example template at `~/.jira.d/templates/bug-fix`:
-
-```yaml
-fields:
-  project:
-    key: ET
-  issuetype:
-    name: Bug
-  summary: "Your issue summary here"
-  priority:
-    name: Highest
-  description: |
-    h2. Summary
-    Brief overview of the issue
-
-    h2. Description
-    Detailed description using Jira wiki markup
-
-    h3. What Changed
-    * Bullet point 1
-    * Bullet point 2
-
-    h3. Files Modified
-    * path/to/file1.ts
-    * path/to/file2.ts
-
-    h3. Testing
-    All tests pass - provide evidence
-
-    h3. Related Links
-    * Branch: branch-name
-    * Commit: commit-hash
-```
-
-### 3. Create Issue from Template
+### 2. Create Issue from Template
 
 ```bash
 export JIRA_API_TOKEN='your-token'
-jira create --noedit -t bug-fix
+jira issue create \
+  --type Bug \
+  --summary "Your issue summary here" \
+  --priority Highest \
+  --template /path/to/bug-fix-description.tmpl \
+  --no-input
 ```
 
-**Output:** `OK ET-1234 https://company.atlassian.net/browse/ET-1234`
+**Alternative:** Set description inline
+
+```bash
+jira issue create \
+  --type Story \
+  --summary "Issue summary" \
+  --body "h2. Description\n\nIssue details here" \
+  --priority High \
+  --label backend \
+  --label "high prio" \
+  --no-input
+```
+
+**Output:** Creates issue and displays key (e.g., `ET-1234`)
 
 ## Jira Wiki Markup Reference
 
@@ -147,13 +158,16 @@ _italic text_
 ```bash
 # Search by keywords in summary and description
 export JIRA_API_TOKEN='your-token'
-jira ls --query "text ~ 'improve CLAUDE' AND project = ET"
+jira issue list "improve CLAUDE"
 
-# Search recent issues
-jira ls --query "project = ET ORDER BY created DESC" | head -10
+# Search with JQL for more precise queries
+jira issue list --jql "text ~ 'improve CLAUDE' AND project = ET"
+
+# List recent issues
+jira issue list --order-by created --reverse --paginate 10
 
 # View specific issue to check if reusable
-jira view ET-8772
+jira issue view ET-8772
 ```
 
 **When to Reuse an Existing Issue:**
@@ -173,12 +187,26 @@ jira view ET-8772
 If no existing issue fits, create one:
 
 ```bash
-# Prepare issue template describing the work
+# Using a template file
 export JIRA_API_TOKEN='your-token'
-jira create --noedit -t your-template
+jira issue create \
+  --type Story \
+  --summary "Brief description of the work" \
+  --priority High \
+  --template /path/to/description-template.tmpl \
+  --no-input
+
+# Or inline without template
+jira issue create \
+  --type Bug \
+  --summary "Fix authentication issue" \
+  --body "h2. Description\n\nDetailed description of the bug" \
+  --priority Highest \
+  --label security \
+  --no-input
 ```
 
-**Capture the issue key** (e.g., ET-1234)
+**Capture the issue key** from output (e.g., ET-1234)
 
 ### 3. Create Feature Branch with Issue Prefix
 
@@ -260,26 +288,30 @@ Check that:
 
 ## Common Mistakes
 
-### ❌ Using jira create Without --noedit
+### ❌ Using jira issue create Without --no-input
 
-**Problem:** Opens editor (vim) which hangs in non-interactive contexts
+**Problem:** Opens interactive prompts which hang in non-interactive contexts
 
-**Fix:** Always use `--noedit` flag with templates
+**Fix:** Always use `--no-input` flag when creating issues programmatically
 
 ### ❌ Forgetting to Export JIRA_API_TOKEN
 
-**Problem:** Authentication fails with "EOF" error
+**Problem:** Authentication fails with "EOF" or "unauthorized" error
 
-**Fix:** Export token in same command block:
+**Fix:** Export token before running commands:
 ```bash
-export JIRA_API_TOKEN='token' && jira create ...
+export JIRA_API_TOKEN='token'
+jira issue create ...
 ```
 
-### ❌ Template Not Found Error
+### ❌ Template File Path Errors
 
-**Problem:** Template file not in `~/.jira.d/templates/`
+**Problem:** Template file not found or incorrect path
 
-**Fix:** Check template location and use filename without extension
+**Fix:** Use absolute paths for template files:
+```bash
+jira issue create --template /full/path/to/template.tmpl --no-input
+```
 
 ### ❌ Using Markdown in Jira Descriptions
 
@@ -290,11 +322,14 @@ export JIRA_API_TOKEN='token' && jira create ...
 - `**bold**` → `*bold*`
 - ` ```code``` ` → `{code}code{code}`
 
-### ❌ Missing Project Key in Config
+### ❌ Missing Project in Config
 
-**Problem:** Must specify project for every create
+**Problem:** Must specify project with `--project` flag for every command
 
-**Fix:** Add `project: XX` to `~/.jira.d/config.yml`
+**Fix:** Set default project during `jira init` or use `--project` flag:
+```bash
+jira issue create --project ET --type Story --summary "..." --no-input
+```
 
 ### ❌ PR Title Without Issue Key Prefix
 
@@ -319,7 +354,8 @@ git checkout -b ET-1234-descriptive-name
 
 **Fix:** Search first, reuse existing issues when appropriate:
 ```bash
-jira ls --query "text ~ 'improve CLAUDE' AND project = ET"
+jira issue list "improve CLAUDE"
+jira issue list --jql "text ~ 'improve CLAUDE' AND project = ET"
 ```
 
 **When to reuse:** Same work across repos, related PRs, follow-up work
@@ -327,23 +363,27 @@ jira ls --query "text ~ 'improve CLAUDE' AND project = ET"
 
 ## Troubleshooting
 
-### Session Authentication Issues
+### Authentication Issues
 
-If `jira session` fails:
+If `jira me` fails or commands return auth errors:
 
-1. Check config file exists: `cat ~/.jira.d/config.yml`
+1. Check config file exists: `cat ~/.config/.jira/.config.yml`
 2. Verify endpoint is correct (no trailing slash)
-3. Generate fresh API token
-4. Try interactive login: `jira login`
+3. Generate fresh API token from Atlassian
+4. Re-run `jira init` with new token:
+   ```bash
+   export JIRA_API_TOKEN='new-token'
+   jira init
+   ```
 
 ### Template Issues
 
 If template doesn't work:
 
-1. Validate YAML syntax (indentation matters)
-2. Check field names match Jira fields
-3. Test with minimal template first
-4. Use `jira create --help` to see available fields
+1. Verify file exists at specified path
+2. Use absolute paths, not relative
+3. Check template contains only description text (no YAML)
+4. Test with inline `--body` first to isolate issue
 
 ### Bitbucket Auto-Linking
 
@@ -358,8 +398,17 @@ For Jira issues to auto-link in Bitbucket:
 
 ### Example 1: New Issue for Security Work
 
-1. **Created Jira issue:** `jira create --noedit -t create-security-issue`
-   - Result: ET-8765 created
+1. **Created Jira issue:**
+   ```bash
+   jira issue create \
+     --type Bug \
+     --summary "Add comprehensive input validation to all public endpoints" \
+     --priority Highest \
+     --label security \
+     --body "h2. Description\n\nAdded input validation to prevent injection attacks" \
+     --no-input
+   ```
+   Result: ET-8765 created
 2. **Created feature branch:** `git checkout -b ET-8765-input-validation-security-fixes`
 3. **Made changes:** Modified 9 files with input validation fixes
 4. **Committed and pushed:** `git commit` and `git push -u origin ET-8765-input-validation-security-fixes`
@@ -373,12 +422,14 @@ For Jira issues to auto-link in Bitbucket:
 
 1. **Searched for existing issues:**
    ```bash
-   jira ls --query "text ~ 'improve CLAUDE' AND project = ET"
+   jira issue list "improve CLAUDE"
+   # Or with JQL:
+   jira issue list --jql "text ~ 'improve CLAUDE' AND project = ET"
    # Found: ET-8772 - Improve CLAUDE.md clarity following Elements of Style
    ```
 2. **Viewed issue to confirm it fits:**
    ```bash
-   jira view ET-8772
+   jira issue view ET-8772
    # Confirmed: Same work (applying Elements of Style to CLAUDE.md)
    ```
 3. **Reused ET-8772 in second repo:**
