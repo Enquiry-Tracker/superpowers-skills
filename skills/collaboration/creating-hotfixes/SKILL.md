@@ -87,7 +87,35 @@ git checkout -b hotfix/ET-XXXX-brief-description
 - Manual verification of the fix
 - DO NOT skip verification (use verification-before-completion skill)
 
-### Step 4: Create PR to Main
+### Step 4: Bump Version Number
+
+**Update package.json version for the hotfix:**
+
+```bash
+# In enrollment_node/ (if backend fix)
+cd enrollment_node
+npm version patch  # Increments patch version (e.g., 1.2.3 -> 1.2.4)
+git add package.json package-lock.json
+git commit -m "Bump version for hotfix ET-XXXX"
+
+# In enrollment_angular/ (if frontend fix)
+cd enrollment_angular
+npm version patch
+git add package.json package-lock.json
+git commit -m "Bump version for hotfix ET-XXXX"
+
+# For both services if fix spans both
+# Bump both package.json files
+```
+
+**Version bump guidelines:**
+- **Patch version** (x.x.X) - Bug fixes, hotfixes (most common)
+- **Minor version** (x.X.x) - New features (rare for hotfix)
+- **Major version** (X.x.x) - Breaking changes (never for hotfix)
+
+**Note:** Hotfixes are almost always patch bumps.
+
+### Step 5: Create PR to Main
 
 **Target branch: main/master (not develop)**
 
@@ -118,7 +146,7 @@ EOF
 )"
 ```
 
-### Step 5: Expedited Review & Deploy
+### Step 6: Expedited Review & Deploy
 
 **Review:**
 - Request immediate review from available team member
@@ -130,7 +158,7 @@ EOF
 - Monitor deployment closely
 - Verify fix in production
 
-### Step 6: Backport to Develop
+### Step 7: Backport to Develop
 
 **Critical: Must happen same day as hotfix deploy**
 
@@ -174,7 +202,7 @@ EOF
 )"
 ```
 
-### Step 7: Post-Hotfix Follow-up
+### Step 8: Post-Hotfix Follow-up
 
 **Within 48 hours:**
 
@@ -188,8 +216,9 @@ EOF
 | Step | Branch | Target | Urgency |
 |------|--------|--------|---------|
 | 1. Hotfix | Branch from `main` | PR to `main` | Immediate |
-| 2. Backport | Branch from `develop` | PR to `develop` | Same day |
-| 3. Follow-up | Branch from `develop` | PR to `develop` | Within 48h |
+| 2. Bump version | `npm version patch` | Include in hotfix | Required |
+| 3. Backport | Branch from `develop` | PR to `develop` | Same day |
+| 4. Follow-up | Branch from `develop` | PR to `develop` | Within 48h |
 
 ## Common Mistakes
 
@@ -200,6 +229,10 @@ EOF
 **Branching from develop**
 - **Problem:** Includes unreleased develop changes in production hotfix
 - **Fix:** Always branch from main/master for hotfixes
+
+**Forgetting to bump version**
+- **Problem:** Deployment tracking unclear, can't correlate logs/errors to specific release
+- **Fix:** `npm version patch` before creating PR. Include version bump commit in hotfix.
 
 **Forgetting to backport**
 - **Problem:** Next release from develop doesn't include hotfix, reintroduces bug
@@ -231,6 +264,7 @@ EOF
 ## Red Flags
 
 **Never:**
+- Skip version bump
 - Skip backport to develop
 - Treat feature requests as hotfixes
 - Refactor during hotfix
@@ -240,6 +274,7 @@ EOF
 **Always:**
 - Verify it's truly production-breaking
 - Branch from main/master
+- Bump version with `npm version patch`
 - PR to main/master first
 - Backport same day
 - Monitor post-deploy
