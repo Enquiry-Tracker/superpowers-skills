@@ -87,31 +87,39 @@ git checkout -b hotfix/ET-XXXX-brief-description
 - Manual verification of the fix
 - DO NOT skip verification (use verification-before-completion skill)
 
-### Step 4: Bump Version Number
+### Step 4: Bump Version Numbers
 
-**Update package.json version for the hotfix:**
+**Update all version identifiers for the hotfix:**
 
 ```bash
-# In enrollment_node/ (if backend fix)
-cd enrollment_node
+# 1. Update package.json version
+cd enrollment_node  # or enrollment_angular
 npm version patch  # Increments patch version (e.g., 1.2.3 -> 1.2.4)
-git add package.json package-lock.json
-git commit -m "Bump version for hotfix ET-XXXX"
 
-# In enrollment_angular/ (if frontend fix)
-cd enrollment_angular
-npm version patch
-git add package.json package-lock.json
-git commit -m "Bump version for hotfix ET-XXXX"
+# 2. Update build version in constants.ts (backend only)
+# Edit src/utils/constants.ts
+# Increment the build number:
+#   public static build = '0183';  →  public static build = '0184';
 
-# For both services if fix spans both
-# Bump both package.json files
+# 3. Commit all version changes together
+git add package.json package-lock.json src/utils/constants.ts
+git commit -m "Bump version for hotfix ET-XXXX"
 ```
+
+**For frontend hotfixes (enrollment_angular):**
+- Only need to bump package.json version
+- No constants.ts build version
+
+**For backend hotfixes (enrollment_node):**
+- Bump package.json version (npm version patch)
+- Increment build in src/utils/constants.ts
+- Commit both changes together
 
 **Version bump guidelines:**
 - **Patch version** (x.x.X) - Bug fixes, hotfixes (most common)
 - **Minor version** (x.X.x) - New features (rare for hotfix)
 - **Major version** (X.x.x) - Breaking changes (never for hotfix)
+- **Build version** - Increment by 1 (e.g., 0183 → 0184)
 
 **Note:** Hotfixes are almost always patch bumps.
 
@@ -232,7 +240,7 @@ EOF
 
 **Forgetting to bump version**
 - **Problem:** Deployment tracking unclear, can't correlate logs/errors to specific release
-- **Fix:** `npm version patch` before creating PR. Include version bump commit in hotfix.
+- **Fix:** Backend: bump package.json AND constants.ts build. Frontend: bump package.json only.
 
 **Forgetting to backport**
 - **Problem:** Next release from develop doesn't include hotfix, reintroduces bug
