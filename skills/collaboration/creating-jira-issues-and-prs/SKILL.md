@@ -2,16 +2,20 @@
 name: Creating Jira Issues and Bitbucket PRs
 description: Create or reuse Jira issues and link them with Bitbucket PRs
 when_to_use: when work is complete and needs tracking in Jira and code review via Bitbucket pull requests
-version: 2.0.0
+version: 2.1.0
 languages: all
-dependencies: jira-cli (ankitpokhrel/jira-cli), git, Bitbucket
+dependencies: Atlassian MCP (Model Context Protocol), git, Bitbucket
 ---
 
 # Creating Jira Issues and Bitbucket PRs
 
 ## Overview
 
-Use jira CLI to create or reuse Jira issues and link them with Bitbucket pull requests. Check for existing issues first to avoid duplication, especially for similar work across repositories.
+**RECOMMENDED:** Use the Atlassian MCP (Model Context Protocol) tools to interact with Jira and Confluence. The MCP provides native integration with Claude Code, offering better error handling, type safety, and user experience than command-line tools.
+
+**Alternative:** For environments without MCP support or specific automation needs, the jira CLI (ankitpokhrel/jira-cli) can be used.
+
+Check for existing issues first to avoid duplication, especially for similar work across repositories.
 
 ## When to Use
 
@@ -25,6 +29,19 @@ Use jira CLI to create or reuse Jira issues and link them with Bitbucket pull re
 
 ## Quick Reference
 
+### Using Atlassian MCP (Recommended)
+
+| Task | MCP Tool |
+|------|----------|
+| Search issues | `mcp__atlassian__search` with query parameter |
+| Search with JQL | `mcp__atlassian__searchJiraIssuesUsingJql` |
+| View issue | `mcp__atlassian__getJiraIssue` with cloudId and issueIdOrKey |
+| Create issue | `mcp__atlassian__createJiraIssue` |
+| Edit issue | `mcp__atlassian__editJiraIssue` |
+| Add comment | `mcp__atlassian__addCommentToJiraIssue` |
+
+### Using jira CLI (Alternative)
+
 | Task | Command |
 |------|---------|
 | Install jira CLI | `brew install jira-cli` |
@@ -37,17 +54,30 @@ Use jira CLI to create or reuse Jira issues and link them with Bitbucket pull re
 
 ## Initial Setup (One-Time)
 
-### 1. Install jira CLI
+### Option 1: Atlassian MCP (Recommended)
+
+**No additional setup required** - The Atlassian MCP is already configured in your Claude Code environment.
+
+**Cloud ID:** You'll need your Atlassian Cloud ID for MCP operations. Find it using:
+```
+mcp__atlassian__getAccessibleAtlassianResources
+```
+
+Or extract from any Jira/Confluence URL (e.g., `https://yourcompany.atlassian.net` can be used directly).
+
+### Option 2: jira CLI (Alternative)
+
+#### 1. Install jira CLI
 
 ```bash
 brew install jira-cli
 ```
 
-### 2. Get API Token
+#### 2. Get API Token
 
 **Get API token:** [https://id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens)
 
-### 3. Initialize Configuration
+#### 3. Initialize Configuration
 
 ```bash
 export JIRA_API_TOKEN='your-api-token'
@@ -63,7 +93,7 @@ The interactive setup will prompt you for:
 
 Configuration is saved to `~/.config/.jira/.config.yml`
 
-### 4. Verify Authentication
+#### 4. Verify Authentication
 
 ```bash
 jira me
@@ -155,6 +185,25 @@ _italic text_
 
 **IMPORTANT:** Before creating a new issue, search for existing ones to avoid duplication.
 
+**Using Atlassian MCP (Recommended):**
+```
+# Search by keywords (searches summary and description)
+mcp__atlassian__search("improve CLAUDE")
+
+# Search with JQL for precise queries
+mcp__atlassian__searchJiraIssuesUsingJql(
+  cloudId="your-cloud-id",
+  jql="text ~ 'improve CLAUDE' AND project = ET"
+)
+
+# View specific issue to check if reusable
+mcp__atlassian__getJiraIssue(
+  cloudId="your-cloud-id",
+  issueIdOrKey="ET-8772"
+)
+```
+
+**Using jira CLI (Alternative):**
 ```bash
 # Search by keywords in summary and description
 export JIRA_API_TOKEN='your-token'
@@ -186,6 +235,18 @@ jira issue view ET-8772
 
 If no existing issue fits, create one:
 
+**Using Atlassian MCP (Recommended):**
+```
+mcp__atlassian__createJiraIssue(
+  cloudId="your-cloud-id",
+  projectKey="ET",
+  issueTypeName="Story",
+  summary="Brief description of the work",
+  description="## Description\n\nDetailed description using Markdown.\n\n### What Changed\n- Item 1\n- Item 2"
+)
+```
+
+**Using jira CLI (Alternative):**
 ```bash
 # Using a template file
 export JIRA_API_TOKEN='your-token'
@@ -228,6 +289,12 @@ git checkout -b ET-1234-short-description
 - Use same issue key in different repositories
 - Example: ET-8772 used for CLAUDE.md improvements in both `superpowers-skills` and other repos
 - Branch name stays consistent: `ET-8772-improve-claude-md`
+
+**Monorepo with independent git repositories:**
+- Some projects contain multiple independent git repos in a parent directory
+- Navigate to the specific repo directory before running git commands
+- Example: Parent `/eq/` contains `enrollment_node/.git`, `enrollment_angular/.git`, `monkey_handler/.git`
+- Commands: `cd enrollment_angular && git checkout develop && git pull origin develop && git checkout -b ET-1234-description`
 
 ### 4. Make Changes and Commit
 
